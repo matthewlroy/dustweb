@@ -1,5 +1,7 @@
 use actix_files::Files;
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use chrono::prelude::*;
+use dustlog::HTTPRequestLog;
 use serde::{Deserialize, Serialize};
 use std::{env, fs::File, io::Write};
 
@@ -8,9 +10,15 @@ struct EndpointNames {
     health_check: &'static str,
 }
 
-static API_ENDPOINTS: EndpointNames = EndpointNames {
-    health_check: "/api/v1/health_check",
-};
+impl EndpointNames {
+    const fn new(endpoint: &'static str) -> Self {
+        EndpointNames {
+            health_check: endpoint,
+        }
+    }
+}
+
+const API_ENDPOINTS: EndpointNames = EndpointNames::new("/api/v1/health_check");
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -18,7 +26,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            .route(API_ENDPOINTS.health_check, web::get().to(api_health_check))
+            .route(&API_ENDPOINTS.health_check, web::get().to(api_health_check))
             .service(Files::new("/", get_env_var("DUST_CHAT_PATH")).index_file("index.html"))
     })
     .bind((
@@ -29,7 +37,20 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
-async fn api_health_check() -> impl Responder {
+async fn api_health_check(req: HttpRequest) -> impl Responder {
+    let log = HTTPRequestLog {
+        timestamp: Utc::now(),
+        requester_ip_address: req
+            .connection_info()
+            .realip_remote_addr()
+            .unwrap()
+            .to_owned(),
+        restful_method: req.method().to_string(),
+        api_called: req.path().to_owned(),
+    };
+
+    println!("{}", log.as_log_str());
+
     HttpResponse::Ok().body("Ok")
 }
 
