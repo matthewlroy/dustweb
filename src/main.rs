@@ -1,9 +1,10 @@
 use actix_files::Files;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::prelude::*;
+use dustcfg::get_env_var;
 use dustlog::HTTPRequestLog;
 use serde::{Deserialize, Serialize};
-use std::{env, fs::File, io::Write};
+use std::{fs::File, io::Write};
 
 #[derive(Serialize, Deserialize)]
 struct EndpointNames {
@@ -64,11 +65,4 @@ fn write_api_endpoints_to_json_file() -> std::io::Result<()> {
     f.write_all(serde_json::to_string(&API_ENDPOINTS).unwrap().as_bytes())?;
 
     Ok(())
-}
-
-fn get_env_var(desired_env_var: &str) -> String {
-    match env::var(desired_env_var) {
-        Ok(v) => v,
-        Err(e) => panic!("${} is not set ({})", desired_env_var, e),
-    }
 }
