@@ -8,6 +8,7 @@ use dustlog::{HTTPRequestLog, LogLevel};
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
+            .route(API_ENDPOINTS.create_user, web::post().to(api_create_user))
             .route(API_ENDPOINTS.health_check, web::get().to(api_health_check))
             .service(Files::new("/", get_env_var("DUST_CHAT_PATH")).index_file("index.html"))
     })
@@ -19,7 +20,17 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
+async fn api_create_user(req: HttpRequest) -> impl Responder {
+    write_request_to_log(req);
+    HttpResponse::Ok().body("posted")
+}
+
 async fn api_health_check(req: HttpRequest) -> impl Responder {
+    write_request_to_log(req);
+    HttpResponse::Ok().body("Ok")
+}
+
+fn write_request_to_log(req: HttpRequest) {
     let _ = HTTPRequestLog {
         log_level: LogLevel::INFO,
         timestamp: Utc::now(),
@@ -32,6 +43,4 @@ async fn api_health_check(req: HttpRequest) -> impl Responder {
         api_called: req.path().to_owned(),
     }
     .write_to_server_log();
-
-    HttpResponse::Ok().body("Ok")
 }
