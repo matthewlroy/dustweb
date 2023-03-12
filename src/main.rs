@@ -2,7 +2,7 @@ use actix_files::Files;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
-use dustlog::HTTPRequestLog;
+use dustlog::{HTTPRequestLog, LogLevel};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -20,7 +20,8 @@ async fn main() -> std::io::Result<()> {
 }
 
 async fn api_health_check(req: HttpRequest) -> impl Responder {
-    let log = HTTPRequestLog {
+    let _ = HTTPRequestLog {
+        log_level: LogLevel::INFO,
         timestamp: Utc::now(),
         requester_ip_address: req
             .connection_info()
@@ -29,9 +30,8 @@ async fn api_health_check(req: HttpRequest) -> impl Responder {
             .to_owned(),
         restful_method: req.method().to_string(),
         api_called: req.path().to_owned(),
-    };
-
-    println!("{}", log.as_log_str());
+    }
+    .write_to_server_log();
 
     HttpResponse::Ok().body("Ok")
 }
