@@ -50,7 +50,7 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                     capture_request_log(
                         LogLevel::INFO,
                         req,
-                        Some("* * * * USER CREDS REDACTED * * * *".to_owned()),
+                        Some("User credentials redacted for security purposes".to_owned()),
                     );
 
                     // 1: Validate input
