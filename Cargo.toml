@@ -9,3 +9,6 @@ actix-web = "4"
 chrono = "0.4.23"
 dustlog = { path = "../dustlog" } 
 dustcfg = { path = "../dustcfg" }
+serde_json = "1.0.94"
+serde = "1.0.156"
+email_address = "0.2.4"

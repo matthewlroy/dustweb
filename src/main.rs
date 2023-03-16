@@ -6,7 +6,24 @@ use actix_web::{
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
 use dustlog::{write_to_server_log, HTTPRequestLog, LogLevel};
+use email_address::*;
+use serde::{Deserialize, Serialize};
 use std::str;
+
+// max payload size is 256 Kb (1024 scale)
+// const MAX_PAYLOAD_SIZE: usize = 262_144;
+
+#[derive(Serialize, Deserialize)]
+struct CreateUserSchema {
+    email: String,
+    password: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct BadResponseSchema {
+    error_field: &'static str,
+    error_message: &'static str,
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -27,29 +44,79 @@ async fn main() -> std::io::Result<()> {
 async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
     match str::from_utf8(&bytes.to_vec()) {
         Ok(seralized_utf8_str) => {
-            capture_request_log(
-                LogLevel::INFO,
-                req,
-                Some("* * * * USER CREDS REDACTED * * * *".to_owned()),
-            );
+            match serde_json::from_str::<CreateUserSchema>(&seralized_utf8_str) {
+                Ok(create_user_obj) => {
+                    // 0: Log the request to server
+                    capture_request_log(
+                        LogLevel::INFO,
+                        req,
+                        Some("* * * * USER CREDS REDACTED * * * *".to_owned()),
+                    );
 
-            // TODO: Make sure we have an email and password here from the input
-            // TODO: Hash + Salt the password
-            // TODO: Send to middleware/dustDb
-            // TODO: Bring response back to client
+                    // 1: Validate input
+                    if EmailAddress::is_valid(&create_user_obj.email) == false {
+                        let invalid_email_response = BadResponseSchema {
+                            error_field: "email",
+                            error_message: "Please enter a valid email address.",
+                        };
+                        return HttpResponse::BadRequest().json(web::Json(&invalid_email_response));
+                    }
 
-            HttpResponse::Ok().body("posted")
+                    if create_user_obj.password.len() < 8 || create_user_obj.password.len() > 255 {
+                        let invalid_password = BadResponseSchema {
+                            error_field: "password",
+                            error_message:
+                                "Please enter a valid password of at least 8 characters.",
+                        };
+                        return HttpResponse::BadRequest().json(web::Json(&invalid_password));
+                    }
+
+                    // TODO: 2: Sanitize email, hash + salt the password
+
+                    // TODO: 4: Send to middleware/dustDb
+
+                    // TODO: 5: Bring response back to client
+
+                    return HttpResponse::Ok().finish();
+                }
+                // Cannot parse the request into the CreateUserSchema, bad request!
+                Err(e) => {
+                    capture_request_log(LogLevel::ERROR, req, Some(e.to_string()));
+                    return HttpResponse::BadRequest().finish();
+                }
+            }
         }
         Err(e) => {
+            // Cannot deserialize the bytes, bad request!
             capture_request_log(LogLevel::ERROR, req, Some(e.to_string()));
-            HttpResponse::BadRequest().body("error")
+            HttpResponse::BadRequest().finish()
         }
     }
 }
 
+// fn check_payload_size(req: &HttpRequest, bytes: &Bytes) -> Result<(), HttpResponse> {
+//     if bytes.len() > MAX_PAYLOAD_SIZE {
+//         let err_string: String = format!("Request payload exceeds {}", MAX_PAYLOAD_SIZE);
+//         let payload_too_large_resp = BadResponseSchema {
+//             error_field: "server",
+//             error_message: "BLAH",
+//         };
+
+//         capture_request_log(
+//             LogLevel::ERROR,
+//             req.to_owned(),
+//             Some(err_string),
+//         );
+
+//         Err(HttpResponse::PayloadTooLarge().json(web::Json(&payload_too_large_resp)))
+//     } else {
+//         Ok(())
+//     }
+// }
+
 async fn api_health_check(req: HttpRequest) -> impl Responder {
     capture_request_log(LogLevel::INFO, req, None);
-    HttpResponse::Ok().body("Ok")
+    HttpResponse::Ok().finish()
 }
 
 fn capture_request_log(level: LogLevel, req: HttpRequest, request_body_utf8_str: Option<String>) {
