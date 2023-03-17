@@ -50,11 +50,12 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                     match serde_json::from_str::<CreateUserSchema>(&seralized_utf8_str) {
                         Ok(create_user_obj) => {
                             // 0: Log the request to server
-                            // capture_request_log(
-                            //     LogLevel::INFO,
-                            //     req,
-                            //     Some("User credentials redacted for security purposes".to_owned()),
-                            // );
+                            capture_request_log(
+                                LogLevel::INFO,
+                                &req,
+                                Some(bytes.len()),
+                                Some("User credentials redacted . . .".to_owned()),
+                            );
 
                             // 1: Validate input
                             if EmailAddress::is_valid(&create_user_obj.email) == false {
@@ -62,8 +63,11 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                     error_field: "email".to_owned(),
                                     error_message: "Please enter a valid email address.".to_owned(),
                                 };
-                                return HttpResponse::BadRequest()
-                                    .json(web::Json(&invalid_email_response));
+
+                                return response_handler(
+                                    HttpResponse::BadRequest(),
+                                    Some(invalid_email_response),
+                                );
                             }
 
                             if create_user_obj.password.len() < 8
@@ -75,29 +79,54 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                         "Please enter a valid password of at least 8 characters."
                                             .to_owned(),
                                 };
-                                return HttpResponse::BadRequest()
-                                    .json(web::Json(&invalid_password));
+
+                                return response_handler(
+                                    HttpResponse::BadRequest(),
+                                    Some(invalid_password),
+                                );
                             }
 
                             // TODO: 2: Sanitize email, hash + salt the password
-
                             // TODO: 4: Send to middleware/dustDb
-
                             // TODO: 5: Bring response back to client
 
-                            return HttpResponse::Ok().finish();
+                            response_handler(HttpResponse::Ok(), None)
                         }
                         // Cannot parse the request into the CreateUserSchema, bad request!
                         Err(e) => {
-                            // capture_request_log(LogLevel::ERROR, req, Some(e.to_string()));
-                            return HttpResponse::BadRequest().finish();
+                            let bad_schema_err_resp = ResponseBodySchema {
+                                error_field: "server".to_owned(),
+                                error_message: "Error occurred parsing the request into JSON"
+                                    .to_string(),
+                            };
+
+                            capture_request_log(
+                                LogLevel::ERROR,
+                                &req,
+                                Some(bytes.len()),
+                                Some(e.to_string()),
+                            );
+
+                            response_handler(HttpResponse::BadRequest(), Some(bad_schema_err_resp))
                         }
                     }
                 }
                 Err(e) => {
                     // Cannot deserialize the bytes, bad request!
-                    // capture_request_log(LogLevel::ERROR, req, Some(e.to_string()));
-                    HttpResponse::BadRequest().finish()
+                    let deserialize_bytes_err_resp = ResponseBodySchema {
+                        error_field: "server".to_owned(),
+                        error_message: "Error occurred deserializing the requested payload"
+                            .to_string(),
+                    };
+
+                    capture_request_log(
+                        LogLevel::ERROR,
+                        &req,
+                        Some(bytes.len()),
+                        Some(e.to_string()),
+                    );
+
+                    response_handler(HttpResponse::BadRequest(), Some(deserialize_bytes_err_resp))
                 }
             }
         }
@@ -126,7 +155,7 @@ fn request_payload_handler(req: &HttpRequest, bytes: &Bytes) -> Result<(), HttpR
             LogLevel::ERROR,
             req,
             Some(bytes.len()),
-            Some("Payload too large to display . . .".to_string()),
+            Some("Payload too large to display . . .".to_owned()),
         );
 
         Err(response_handler(
@@ -211,6 +240,7 @@ fn capture_request_log(
 fn get_log_level_from_status(status_code: &u16) -> LogLevel {
     match status_code {
         200 => LogLevel::INFO,
+        400 => LogLevel::ERROR,
         413 => LogLevel::ERROR,
         _ => LogLevel::INFO,
     }
