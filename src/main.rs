@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
 use dustlog::{write_to_server_log, HTTPRequestLog, HTTPResponseLog, LogLevel, LogType};
 use email_address::*;
+use pwhash::bcrypt;
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -48,7 +49,7 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
             match str::from_utf8(&bytes.to_vec()) {
                 Ok(seralized_utf8_str) => {
                     match serde_json::from_str::<CreateUserSchema>(&seralized_utf8_str) {
-                        Ok(create_user_obj) => {
+                        Ok(mut create_user_obj) => {
                             // 0: Log the request to server
                             capture_request_log(
                                 LogLevel::INFO,
@@ -58,6 +59,8 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                             );
 
                             // 1: Validate input
+
+                            // 1a: Validate email!
                             if EmailAddress::is_valid(&create_user_obj.email) == false {
                                 let invalid_email_response = ResponseBodySchema {
                                     error_field: "email".to_owned(),
@@ -70,6 +73,7 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                 );
                             }
 
+                            // 1b: Validate password!
                             if create_user_obj.password.len() < 8
                                 || create_user_obj.password.len() > 255
                             {
@@ -86,8 +90,15 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                 );
                             }
 
-                            // TODO: 2: Sanitize email, hash + salt the password
+                            // 2: Sanitize email, hash password
+                            create_user_obj.email = create_user_obj.email.trim().to_lowercase();
+                            create_user_obj.password =
+                                bcrypt::hash(create_user_obj.password).unwrap();
+
                             // TODO: 4: Send to middleware/dustDb
+                            println!("create_user_obj.email = {:?}", create_user_obj.email);
+                            println!("create_user_obj.password = {:?}", create_user_obj.password);
+
                             // TODO: 5: Bring response back to client
 
                             response_handler(HttpResponse::Ok(), None)
