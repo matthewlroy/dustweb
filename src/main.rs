@@ -13,7 +13,6 @@ use std::str;
 
 // Max payload size is 128Kb (1024 scale => 131,072 bytes)
 const MAX_INCOMING_PAYLOAD_SIZE: usize = 131_072;
-const SERVER_ADDR: &str = "127.0.0.1";
 
 #[derive(Serialize, Deserialize)]
 struct CreateUserSchema {
@@ -36,7 +35,7 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/", get_env_var("DUST_CHAT_PATH")).index_file("index.html"))
     })
     .bind((
-        SERVER_ADDR,
+        get_env_var("DUST_SERVER_ADDR"),
         get_env_var("DUST_SERVER_PORT").parse::<u16>().unwrap(),
     ))?
     .run()
@@ -209,7 +208,7 @@ fn capture_response_log(res: &HttpResponse, body_as_utf8_str: Option<String>) {
             timestamp: Utc::now(),
             log_level: get_log_level_from_status(&res.status().as_u16()),
             log_type: LogType::RESPONSE,
-            originating_ip_addr: SERVER_ADDR.to_owned(),
+            originating_ip_addr: get_env_var("DUST_SERVER_ADDR"),
             response_status_code: res.status().as_u16(),
             body_as_utf8_str,
         }
