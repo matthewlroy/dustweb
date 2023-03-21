@@ -29,6 +29,15 @@ struct ResponseBodySchema {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    println!(
+        "{}",
+        format!(
+            "dustweb successfully started, listening on: {}:{}",
+            get_env_var("DUST_SERVER_ADDR"),
+            get_env_var("DUST_SERVER_PORT")
+        )
+    );
+
     HttpServer::new(|| {
         App::new()
             .route(API_ENDPOINTS.create_user, web::post().to(api_create_user))
