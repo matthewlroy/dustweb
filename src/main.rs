@@ -5,7 +5,7 @@ use actix_web::{
 };
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
-use dustlog::{write_to_server_log, HTTPRequestLog, HTTPResponseLog, LogLevel, LogType};
+use dustlog::{write_to_log, HTTPRequestLog, HTTPResponseLog, LogDistinction, LogLevel, LogType};
 use dustmw::dust_db_health_check;
 use email_address::*;
 use pwhash::bcrypt;
@@ -225,7 +225,7 @@ fn response_handler(
 }
 
 fn capture_response_log(res: &HttpResponse, body_as_utf8_str: Option<String>) {
-    match write_to_server_log(
+    match write_to_log(
         HTTPResponseLog {
             timestamp: Utc::now(),
             log_level: get_log_level_from_status(&res.status().as_u16()),
@@ -235,6 +235,7 @@ fn capture_response_log(res: &HttpResponse, body_as_utf8_str: Option<String>) {
             body_as_utf8_str,
         }
         .as_log_str(),
+        LogDistinction::SERVER,
     ) {
         Ok(_) => (),
         Err(e) => eprintln!("{:?}", e),
@@ -247,7 +248,7 @@ fn capture_request_log(
     payload_size_in_bytes: Option<usize>,
     body_as_utf8_str: Option<String>,
 ) {
-    match write_to_server_log(
+    match write_to_log(
         HTTPRequestLog {
             timestamp: Utc::now(),
             log_level,
@@ -263,6 +264,7 @@ fn capture_request_log(
             body_as_utf8_str,
         }
         .as_log_str(),
+        LogDistinction::SERVER,
     ) {
         Ok(_) => (),
         Err(e) => eprintln!("{:?}", e),
