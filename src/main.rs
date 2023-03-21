@@ -6,6 +6,7 @@ use actix_web::{
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
 use dustlog::{write_to_server_log, HTTPRequestLog, HTTPResponseLog, LogLevel, LogType};
+use dustmw::dust_db_health_check;
 use email_address::*;
 use pwhash::bcrypt;
 use serde::{Deserialize, Serialize};
@@ -146,7 +147,19 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
 
 async fn api_health_check(req: HttpRequest) -> impl Responder {
     capture_request_log(LogLevel::INFO, &req, None, None);
-    response_handler(HttpResponse::Ok(), None)
+
+    match dust_db_health_check().await {
+        Ok(_) => response_handler(HttpResponse::Ok(), None),
+        Err(e) => {
+            // Couldn't connect to our DB, error out!
+            let no_db_conn_resp = ResponseBodySchema {
+                error_field: "server".to_owned(),
+                error_message: e.to_string(),
+            };
+
+            response_handler(HttpResponse::InternalServerError(), Some(no_db_conn_resp))
+        }
+    }
 }
 
 fn request_payload_handler(req: &HttpRequest, bytes: &Bytes) -> Result<(), HttpResponse> {
@@ -252,6 +265,7 @@ fn get_log_level_from_status(status_code: &u16) -> LogLevel {
         200 => LogLevel::INFO,
         400 => LogLevel::ERROR,
         413 => LogLevel::ERROR,
+        500 => LogLevel::ERROR,
         _ => LogLevel::INFO,
     }
 }
