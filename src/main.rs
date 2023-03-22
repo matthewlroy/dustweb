@@ -5,7 +5,7 @@ use actix_web::{
 };
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
-use dustlog::{write_to_log, HTTPRequestLog, HTTPResponseLog, LogDistinction, LogLevel, LogType};
+use dustlog::{write_to_log, HTTPRequestLog, HTTPResponseLog, LogLevel};
 use dustmw::dust_db_health_check;
 use email_address::*;
 use pwhash::bcrypt;
@@ -225,18 +225,15 @@ fn response_handler(
 }
 
 fn capture_response_log(res: &HttpResponse, body_as_utf8_str: Option<String>) {
-    match write_to_log(
-        HTTPResponseLog {
-            timestamp: Utc::now(),
-            log_level: get_log_level_from_status(&res.status().as_u16()),
-            log_type: LogType::RESPONSE,
-            originating_ip_addr: get_env_var("DUST_SERVER_ADDR"),
-            response_status_code: res.status().as_u16(),
-            body_as_utf8_str,
-        }
-        .as_log_str(),
-        LogDistinction::SERVER,
-    ) {
+    let log = HTTPResponseLog {
+        timestamp: Utc::now(),
+        log_level: get_log_level_from_status(&res.status().as_u16()),
+        originating_ip_addr: get_env_var("DUST_SERVER_ADDR"),
+        response_status_code: res.status().as_u16(),
+        body_as_utf8_str,
+    };
+
+    match write_to_log(log.as_log_str(), log.get_log_distinction()) {
         Ok(_) => (),
         Err(e) => eprintln!("{:?}", e),
     }
@@ -248,24 +245,21 @@ fn capture_request_log(
     payload_size_in_bytes: Option<usize>,
     body_as_utf8_str: Option<String>,
 ) {
-    match write_to_log(
-        HTTPRequestLog {
-            timestamp: Utc::now(),
-            log_level,
-            log_type: LogType::REQUEST,
-            originating_ip_addr: req
-                .connection_info()
-                .realip_remote_addr()
-                .unwrap()
-                .to_owned(),
-            api: req.path().to_owned(),
-            restful_method: req.method().to_string(),
-            payload_size_in_bytes,
-            body_as_utf8_str,
-        }
-        .as_log_str(),
-        LogDistinction::SERVER,
-    ) {
+    let log = HTTPRequestLog {
+        timestamp: Utc::now(),
+        log_level,
+        originating_ip_addr: req
+            .connection_info()
+            .realip_remote_addr()
+            .unwrap()
+            .to_owned(),
+        api: req.path().to_owned(),
+        restful_method: req.method().to_string(),
+        payload_size_in_bytes,
+        body_as_utf8_str,
+    };
+
+    match write_to_log(log.as_log_str(), log.get_log_distinction()) {
         Ok(_) => (),
         Err(e) => eprintln!("{:?}", e),
     }
