@@ -6,7 +6,7 @@ use actix_web::{
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
 use dustlog::{write_to_log, HTTPRequestLog, HTTPResponseLog, LogLevel};
-use dustmw::dust_db_health_check;
+use dustmw::{dust_db_health_check, CreateUserSchema};
 use email_address::*;
 use pwhash::bcrypt;
 use serde::{Deserialize, Serialize};
@@ -14,12 +14,6 @@ use std::str;
 
 // Max payload size is 128Kb (1024 scale => 131,072 bytes)
 const MAX_INCOMING_PAYLOAD_SIZE: usize = 131_072;
-
-#[derive(Serialize, Deserialize)]
-struct CreateUserSchema {
-    email: String,
-    password: String,
-}
 
 #[derive(Serialize, Deserialize)]
 struct ResponseBodySchema {
