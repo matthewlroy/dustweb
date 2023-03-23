@@ -6,7 +6,7 @@ use actix_web::{
 use chrono::prelude::*;
 use dustcfg::{get_env_var, API_ENDPOINTS};
 use dustlog::{write_to_log, HTTPRequestLog, HTTPResponseLog, LogLevel};
-use dustmw::{dust_db_health_check, CreateUserSchema};
+use dustmw::{dust_db_create_user, dust_db_health_check, CreateUserSchema};
 use email_address::*;
 use pwhash::bcrypt;
 use serde::{Deserialize, Serialize};
@@ -98,13 +98,23 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                             create_user_obj.password =
                                 bcrypt::hash(create_user_obj.password).unwrap();
 
-                            // TODO: 4: Send to middleware/dustDb
-                            println!("create_user_obj.email = {:?}", create_user_obj.email);
-                            println!("create_user_obj.password = {:?}", create_user_obj.password);
+                            // 3: Send to middleware/dustDb
+                            match dust_db_create_user(create_user_obj).await {
+                                // TODO: Navigate user? Use the uuidv4? Next steps here!
+                                Ok(_) => response_handler(HttpResponse::Ok(), None),
+                                // Something went wrong when creating the user
+                                Err(e) => {
+                                    let db_error_resp = ResponseBodySchema {
+                                        error_field: "server".to_owned(),
+                                        error_message: e.to_string(),
+                                    };
 
-                            // TODO: 5: Bring response back to client
-
-                            response_handler(HttpResponse::Ok(), None)
+                                    response_handler(
+                                        HttpResponse::InternalServerError(),
+                                        Some(db_error_resp),
+                                    )
+                                }
+                            }
                         }
                         // Cannot parse the request into the CreateUserSchema, bad request!
                         Err(e) => {
@@ -153,8 +163,8 @@ async fn api_health_check(req: HttpRequest) -> impl Responder {
 
     match dust_db_health_check().await {
         Ok(_) => response_handler(HttpResponse::Ok(), None),
+        // Couldn't connect to our DB, error out!
         Err(e) => {
-            // Couldn't connect to our DB, error out!
             let no_db_conn_resp = ResponseBodySchema {
                 error_field: "server".to_owned(),
                 error_message: e.to_string(),
