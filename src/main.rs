@@ -107,7 +107,7 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                 Err(e) => match e.kind() {
                                     ErrorKind::AlreadyExists => {
                                         let db_error_resp = ResponseBodySchema {
-                                            error_field: "server".to_owned(),
+                                            error_field: "email".to_owned(),
                                             error_message: e.to_string(),
                                         };
 
