@@ -10,6 +10,7 @@ use dustmw::{dust_db_create_user, dust_db_health_check, CreateUserSchema};
 use email_address::*;
 use pwhash::bcrypt;
 use serde::{Deserialize, Serialize};
+use std::io::ErrorKind;
 use std::str;
 
 // Max payload size is 128Kb (1024 scale => 131,072 bytes)
@@ -103,17 +104,30 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                 // TODO: Navigate user? Use the uuidv4? Next steps here!
                                 Ok(_) => response_handler(HttpResponse::Ok(), None),
                                 // Something went wrong when creating the user
-                                Err(e) => {
-                                    let db_error_resp = ResponseBodySchema {
-                                        error_field: "server".to_owned(),
-                                        error_message: e.to_string(),
-                                    };
+                                Err(e) => match e.kind() {
+                                    ErrorKind::AlreadyExists => {
+                                        let db_error_resp = ResponseBodySchema {
+                                            error_field: "server".to_owned(),
+                                            error_message: e.to_string(),
+                                        };
 
-                                    response_handler(
-                                        HttpResponse::InternalServerError(),
-                                        Some(db_error_resp),
-                                    )
-                                }
+                                        response_handler(
+                                            HttpResponse::Conflict(),
+                                            Some(db_error_resp),
+                                        )
+                                    }
+                                    _ => {
+                                        let db_error_resp = ResponseBodySchema {
+                                            error_field: "server".to_owned(),
+                                            error_message: e.to_string(),
+                                        };
+
+                                        response_handler(
+                                            HttpResponse::InternalServerError(),
+                                            Some(db_error_resp),
+                                        )
+                                    }
+                                },
                             }
                         }
                         // Cannot parse the request into the CreateUserSchema, bad request!
@@ -273,6 +287,7 @@ fn get_log_level_from_status(status_code: &u16) -> LogLevel {
     match status_code {
         200 => LogLevel::INFO,
         400 => LogLevel::ERROR,
+        409 => LogLevel::ERROR,
         413 => LogLevel::ERROR,
         500 => LogLevel::ERROR,
         _ => LogLevel::INFO,
