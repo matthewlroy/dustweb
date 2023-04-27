@@ -105,6 +105,7 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                 Ok(_) => response_handler(HttpResponse::Ok(), None),
                                 // Something went wrong when creating the user
                                 Err(e) => match e.kind() {
+                                    // User already exists!
                                     ErrorKind::AlreadyExists => {
                                         let db_error_resp = ResponseBodySchema {
                                             error_field: "email".to_owned(),
@@ -116,6 +117,8 @@ async fn api_create_user(req: HttpRequest, bytes: Bytes) -> impl Responder {
                                             Some(db_error_resp),
                                         )
                                     }
+
+                                    // Generic error catch-all
                                     _ => {
                                         let db_error_resp = ResponseBodySchema {
                                             error_field: "server".to_owned(),
